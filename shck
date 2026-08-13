@@ -1,0 +1,205 @@
+#!/bin/sh
+# shck - ShellCheck with fix suggestions (pipe-based)
+set -eu
+
+PROGPATH="$(realpath -m "$0")"
+PROGDIR="${PROGPATH%/*}"
+PROGNAME="${PROGPATH##*/}"
+
+FIXES_FILE="$PROGDIR/shellcheck-fixes.json"
+
+COLS="message|file|codeLine|caret|disable|fix|correctCode|problematicCode|rationale"
+columns="$COLS"
+
+usage() {
+    cat <<EOF
+Usage: $PROGNAME [-f|--format FMT] [-c|--columns LIST] [FILE...]
+
+$PROGNAME - ShellCheck with fix suggestions (pipe-based)
+
+Reads FILEs, or stdin when FILE is '-' or omitted.
+
+Options:
+  -f, --format FMT     Output format: markdown, ansi or json (default: json)
+  -c, --columns LIST   '|'-separated fields to show (default: all)
+  -h, --help           Show this help and exit
+
+Columns:
+  message             ShellCheck message text
+  file                File and position (file - line/column)
+  codeLine            Source line of the finding
+  caret               Caret marker under the offending column
+  disable             shellcheck disable comment for the finding
+  fix                 Short fix advice
+  correctCode         Corrected example code
+  problematicCode     Problematic example code
+  rationale           Full explanation
+
+Examples:
+  $PROGNAME script.sh
+  $PROGNAME -f markdown -c 'message|file|fix' script.sh
+
+Exit codes:
+  0   no issues found
+  1   issues found
+  2   usage or tool error
+EOF
+exit "${1:-0}"
+}
+
+# shellcheck disable=SC2016
+FIXES_JQ='.comments | map(
+    . as $c
+    | ("SC" + ($c.code|tostring)) as $k
+    | $fixes[0][$k] as $f
+    | ($src | split("\n") | .[($c.line)-1]) as $ln
+    | $c + {
+        codeLine: ($ln // ""),
+        fix: ($f.fix//""),
+        rationale: ($f.rationale//""),
+        correctCode: ($f.correctCode//""),
+        problematicCode: ($f.problematicCode//"")})'
+
+        merge_fixes() {
+            if [ "$1" = - ]; then
+                shellcheck --format json1 --shell sh - \
+                    | jq --slurpfile fixes "$FIXES_FILE" --rawfile src "$stdin_src" "$FIXES_JQ"
+            else
+                shellcheck --format json1 --shell sh "$1" \
+                    | jq --slurpfile fixes "$FIXES_FILE" --rawfile src "$1" "$FIXES_JQ"
+            fi
+        }
+
+# shellcheck disable=SC3043
+render() {
+    local format="$1"
+    local columns="$2"
+    shift 2
+
+    case "$format" in
+        markdown|ansi) ;;
+        json)
+            merged=$(for f in "$@"; do merge_fixes "$f"; done | jq -s add)
+            printf '%s\n' "$merged"
+            if [ "$(printf '%s' "$merged" | jq 'length')" -eq 0 ]; then
+                echo "No shellcheck issues found." >&2
+                return 0
+            fi
+            return 1
+            ;;
+        *)
+            echo "unknown format: $format (markdown|ansi|json)" >&2
+            exit 2
+            ;;
+    esac
+
+    filter='def fmt: gsub("\\|\\|"; "\u0001") | gsub("\\|"; "\n|") | gsub("\u0001"; "\n||") | gsub("&&"; "\n&&") | split("\n") | map(rtrimstr(" ")) | join("\n"); .[] | '
+    for col in $(printf '%s' "$columns" | tr '|' '\n'); do
+        case "$col" in
+            message)
+                if [ "$format" = ansi ]; then
+                    filter="$filter"'.message + "\n" + ("-" * 79) + "\n" + '
+                else
+                    filter="$filter"'"# " + .message + "\n\n" + '
+                fi
+                ;;
+            file)
+                filter="$filter"'"> " + .file + " - " + (.line|tostring) + "/" + (.column|tostring) + "\n" + '
+                ;;
+            codeLine)
+                filter="$filter"'(if (.codeLine != "") then "> " + (.line|tostring) + " " + (.codeLine|fmt) + "\n" else "" end) + '
+                ;;
+            caret)
+                filter="$filter"'(((" " * .column)|tostring) + "   ־\n") + '
+                ;;
+            disable)
+                # shellcheck disable=SC2016
+                filter="$filter"'(if (.codeLine != "") then "## Disable\n\n```sh\n# shellcheck disable=SC" + (.code|tostring) + "\n" + (.codeLine|fmt|trim) + "\n```\n\n" else "" end) + '
+                ;;
+            fix)
+                # shellcheck disable=SC2016
+                filter="$filter"'(if (.fix != "") then "## Fix\n\n```sh\n" + .fix + "\n```\n\n" else "" end) + '
+                ;;
+            correctCode)
+                # shellcheck disable=SC2016
+                filter="$filter"'(if (.correctCode != "") then "## Correct code\n\n```sh\n" + .correctCode + "\n```\n\n" else "" end) + '
+                ;;
+            problematicCode)
+                # shellcheck disable=SC2016
+                filter="$filter"'(if (.problematicCode != "") then "## Problematic code\n\n```sh\n" + .problematicCode + "\n```\n\n" else "" end) + '
+                ;;
+            rationale)
+                filter="$filter"'(if (.rationale != "") then "## Rationale\n\n" + .rationale + "\n\n--\n" else "" end) + '
+                ;;
+        esac
+    done
+    filter="${filter% + }"
+
+    found=0
+    for f in "$@"; do
+        data=$(merge_fixes "$f")
+        if [ -n "$data" ] && [ "$(printf '%s' "$data" | jq 'length')" -gt 0 ]; then
+            found=1
+        fi
+        printf '%s\n' "$data" | jq -r "$filter"
+    done
+    if [ "$found" -eq 0 ]; then
+        echo "No shellcheck issues found."
+        return 0
+    fi
+    return 1
+}
+
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        -f|--format)
+            format="${2:-json}"
+            shift ${2:+2}
+            ;;
+        -c|--columns)
+            columns="${2:-$columns}"
+            shift ${2:+2}
+            ;;
+        -h|--help)
+            usage 0
+            ;;
+        -)
+            break
+            ;;
+        -*) printf "%s\n" "Unknown option: $1";
+            usage 2
+            ;;
+        *)
+            break
+            ;;
+    esac
+done
+
+if [ "$#" -eq 0 ]; then
+    [ -t 0 ] && usage 2
+    set -- -
+fi
+
+stdin_src=""
+for f in "$@"; do
+    if [ "$f" = - ]; then
+        stdin_src=$(mktemp)
+        trap 'rm -f "$stdin_src"' EXIT
+        cat > "$stdin_src"
+        exec < "$stdin_src"
+        break
+    fi
+done
+
+for f in "$@"; do
+    [ "$f" = - ] || [ -f "$f" ] || { printf "%s\n" "$PROGNAME: no such file: $f" >&2; exit 2; }
+done
+
+for col in $(printf '%s' "$columns" | tr '|' '\n'); do
+    if ! printf '%s\n' "$COLS" | tr '|' '\n' | grep -qx "$col"; then
+        echo "unknown field: $col ($COLS)" >&2
+        exit 2
+    fi
+done
+
+render "${format:-json}" "$columns" "$@" || exit $?

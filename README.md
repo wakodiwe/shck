@@ -1,17 +1,30 @@
-# shckj.sh
+# shck
 
-ShellCheck with fix suggestions. Runs `shellcheck --format json1 -s sh FILE` and enriches each SCxxxx comment with `fix`, `rationale`, `correctCode`, `problematicCode` looked up from `shellcheck-fixes.json`. Output is the enriched JSON array on stdout.
+ShellCheck with fix suggestions. Runs 'shellcheck --format json1 -s sh FILE' and enriches each SCxxxx comment with 'fix`, 'rationale`, 'correctCode`, 'problematicCode' looked up from 'shellcheck-fixes.json`. Output is the enriched JSON array on stdout.
 
 ## Requirements
 
-- `shellcheck`
-- `jq`
+- 'shellcheck`
+- 'jq`
 
 ## Usage
 
 ```sh
-sh shckj.sh FILE
+sh shck FILE
 ```
+
+Or read a script from stdin (FILE is '-' or omitted):
+
+```sh
+printf '%s\n' 'echo "hi $USER"' | sh shck
+sh shck -
+```
+
+## Exit codes
+
+- '0' - no issues found
+- '1' - issues found
+- '2' - usage or tool error
 
 ## Demo
 
@@ -26,7 +39,7 @@ echo "args: '$@'"
 EOF
 printf ">_ sh %s\n" "$TEST_SCRIPT"
 sh "$TEST_SCRIPT"
-printf "\n%s\n" ">_ sh shckj.sh $TEST_SCRIPT"
-sh shckj.sh "$TEST_SCRIPT"
+printf "\n%s\n" ">_ sh shck $TEST_SCRIPT"
+sh shck "$TEST_SCRIPT"
 rm -f "$TEST_SCRIPT"
 ```
