@@ -58,17 +58,18 @@ FIXES_JQ='.comments | map(
         fix: ($f.fix//""),
         rationale: ($f.rationale//""),
         correctCode: ($f.correctCode//""),
-        problematicCode: ($f.problematicCode//"")})'
+        problematicCode: ($f.problematicCode//"")
+    })'
 
-        merge_fixes() {
-            if [ "$1" = - ]; then
-                shellcheck --format json1 --shell sh - \
-                    | jq --slurpfile fixes "$FIXES_FILE" --rawfile src "$stdin_src" "$FIXES_JQ"
-            else
-                shellcheck --format json1 --shell sh "$1" \
-                    | jq --slurpfile fixes "$FIXES_FILE" --rawfile src "$1" "$FIXES_JQ"
-            fi
-        }
+merge_fixes() {
+    if [ "$1" = - ]; then
+        shellcheck --format json1 --shell sh - \
+            | jq --slurpfile fixes "$FIXES_FILE" --rawfile src "$stdin_src" "$FIXES_JQ"
+    else
+        shellcheck --format json1 --shell sh "$1" \
+            | jq --slurpfile fixes "$FIXES_FILE" --rawfile src "$1" "$FIXES_JQ"
+    fi
+}
 
 # shellcheck disable=SC3043
 render() {
