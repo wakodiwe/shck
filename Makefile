@@ -19,6 +19,6 @@ devinstall: uninstall
 	@chmod +x $(DEST)
 	@printf "Softlinked to %s\n" "$(DEST)"
 
-regen:                m
+regen:
 	@sh regen.sh
 	@printf "Dataset rebuilt and spliced into shck\n"
