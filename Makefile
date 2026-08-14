@@ -1,7 +1,7 @@
 PREFIX ?= $(HOME)/.local
 DEST   := $(PREFIX)/bin/shck
 
-.PHONY: install uninstall
+.PHONY: install uninstall regen
 
 install: uninstall
 	@mkdir -p $(dir $(DEST))
@@ -12,3 +12,7 @@ install: uninstall
 uninstall:
 	@rm -f $(DEST)
 	@printf "Removed %s\n" "$(DEST)"
+
+regen:
+	@sh regen.sh
+	@printf "Dataset rebuilt and spliced into shck\n"
