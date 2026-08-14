@@ -2,6 +2,8 @@
 # shck - ShellCheck with fix suggestions (pipe-based)
 set -eu
 
+VERSION="0.1.0"
+
 PROGPATH="$(realpath -m "$0")"
 PROGNAME="${PROGPATH##*/}"
 
@@ -28,6 +30,7 @@ Options:
   -f, --format FMT     Output format: markdown, ansi or json (default: json)
   -c, --columns LIST   '|'-separated fields to show (default: all)
   -h, --help           Show this help and exit
+  -V, --version        Show the version and exit
 
 Columns:
   message             ShellCheck message text
@@ -177,6 +180,10 @@ while [ "$#" -gt 0 ]; do
             ;;
         -h|--help)
             usage 0
+            ;;
+        -V|--version)
+            printf "%s\n" "$VERSION"
+            exit 0
             ;;
         -)
             break
