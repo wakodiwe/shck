@@ -1,6 +1,6 @@
 # shck
 
-ShellCheck with fix suggestions. Runs 'shellcheck --format json1 -s sh FILE' and enriches each SCxxxx comment with 'fix`, 'rationale`, 'correctCode`, 'problematicCode' looked up from the dataset embedded in the script. Output is the enriched JSON array on stdout.
+[ShellCheck](https://github.com/koalaman/shellcheck) wrapper with fix suggestions. Runs 'shellcheck --format json1 -s sh FILE' and enriches each SCxxxx comment with 'fix`, 'rationale`, 'correctCode`, 'problematicCode' looked up from the dataset embedded in the script. Output is the enriched JSON array on stdout.
 
 ## Requirements
 
