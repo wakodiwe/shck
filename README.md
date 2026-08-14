@@ -1,46 +1,41 @@
 # shck
 
-[ShellCheck](https://github.com/koalaman/shellcheck) wrapper with fix suggestions. Runs 'shellcheck --format json1 -s sh FILE' and enriches each SCxxxx comment with 'fix`, 'rationale`, 'correctCode`, 'problematicCode' looked up from the dataset embedded in the script. Output is the enriched JSON array on stdout.
 
-## Requirements
+[ShellCheck](https://github.com/koalaman/shellcheck) is great at finding problems in shell scripts - but it often tells you *what's* wrong without telling you *how to fix it*. shck fills that gap: for every warning it also shows you the fix, the reason behind it, the code that caused it, and the corrected version.
 
-- 'shellcheck`
-- 'jq`
+## You need
 
-## Usage
+- [`shellcheck`](https://github.com/koalaman/shellcheck#installing) - The checker itself
+- [`jq`](https://stedolan.github.io/jq/download/) - Used behind the scenes for formatting
 
-```sh
-sh shck FILE
-```
+## How to use it
 
-Or read a script from stdin (FILE is '-' or omitted):
+Point it at a script:
 
 ```sh
-printf '%s\n' 'echo "hi $USER"' | sh shck
-sh shck -
+sh shck my-script.sh
 ```
 
-## Exit codes
+That's it. You'll get a list of findings with suggested fixes. Need fancy formatting?
 
-- '0' - no issues found
-- '1' - issues found
-- '2' - usage or tool error
+- 'sh shck -f markdown my-script.sh' - Nice for sharing or documentation
+- 'sh shck -f ansi my-script.sh' - Colored output for the terminal
 
-## Rebuilding the fix dataset
-
-The fix dataset is embedded in `shck` between the `#__SHCK_FIXES_BEGIN__` / `#__SHCK_FIXES_END__` markers. Rebuild it from the ShellCheck wiki:
+You can also paste a script in without saving it to a file:
 
 ```sh
-git clone --depth 1 https://github.com/koalaman/shellcheck.wiki /tmp/opencode/shellcheck.wiki
-sh regen.sh                 # rebuild from /tmp/opencode/shellcheck.wiki and splice into shck
-sh regen.sh /path/to/wiki   # custom wiki clone location
+printf '%s\n' 'echo "hi" $USER' | sh shck
 ```
 
-The rebuild aborts (exit 2) if the wiki clone has no `SC*.md` pages or yields fewer than 100 entries, to avoid overwriting the embedded dataset with a broken one.
+## What the exit code means
 
-## Demo
+- 0 - no problems found, you're good
+- 1 - problems found in script (check the output)
+- 2 - something went wrong with the shck or its usage
 
-Run a test script through the tool:
+## Try it yourself
+
+This runs a tiny test script through the tool so you can see it in action:
 
 ```sh
 TEST_SCRIPT=$(mktemp /tmp/sc_test_XXXXXX.sh)
@@ -55,3 +50,15 @@ printf "\n%s\n" ">_ sh shck $TEST_SCRIPT"
 sh shck "$TEST_SCRIPT"
 rm -f "$TEST_SCRIPT"
 ```
+
+## For the curious: rebuilding the fix database
+
+shck's fix suggestions are bundled right inside the script - nothing extra to download. If you want to refresh them from the official ShellCheck wiki:
+
+```sh
+git clone --depth 1 https://github.com/koalaman/shellcheck.wiki /tmp/opencode/shellcheck.wiki
+sh regen.sh                 # rebuild and update shck in one go
+sh regen.sh /path/to/wiki   # if you cloned it somewhere else
+```
+
+The rebuild plays it safe: if the wiki looks broken (no pages, or too few entries), it stops instead of overwriting the working data.
